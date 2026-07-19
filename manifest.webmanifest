@@ -1,0 +1,14 @@
+{
+  "name": "World Cup Final Companion — Spain v Argentina",
+  "short_name": "WC Final",
+  "description": "Live second-screen companion: momentum, xG race, win probability, and a next-event prediction game.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

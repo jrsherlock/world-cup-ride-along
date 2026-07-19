@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>ESP v ARG · Final Companion</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #131a30; --panel2: #1a2340; --line: #26304f;
+    --text: #e8ecf8; --muted: #8b94b0;
+    --esp: #e63946; --arg: #6cb8e8; --gold: #f4c95d; --green: #4ade80;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: 40px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 12px; }
+
+  /* ---------- scoreboard ---------- */
+  .scoreboard {
+    background: linear-gradient(180deg, var(--panel2), var(--panel));
+    border: 1px solid var(--line); border-radius: 16px; padding: 18px 14px 12px;
+    text-align: center; position: sticky; top: 8px; z-index: 10;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  }
+  .matchup { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .team { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .team img { width: 52px; height: 52px; object-fit: contain; }
+  .team .name { font-weight: 700; font-size: 15px; }
+  .team.esp .name { color: var(--esp); } .team.arg .name { color: var(--arg); }
+  .score { font-size: 44px; font-weight: 800; letter-spacing: 2px; min-width: 130px; font-variant-numeric: tabular-nums; }
+  .status { color: var(--gold); font-size: 13px; font-weight: 600; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .status.live::before { content: "●"; color: var(--green); margin-right: 6px; animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; margin-top: 12px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 10px; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .hint a { color: var(--gold); }
+
+  /* win probability */
+  .wp-bar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; font-size: 12px; font-weight: 700; }
+  .wp-bar div { display: flex; align-items: center; justify-content: center; min-width: 34px; transition: width .8s ease; }
+  .wp-esp { background: var(--esp); } .wp-draw { background: #3a4468; } .wp-arg { background: var(--arg); color: #08263a; }
+  .wp-note { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+  /* stats grid */
+  .statrow { display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: center; gap: 8px; padding: 5px 0; font-variant-numeric: tabular-nums; }
+  .statrow .label { text-align: center; color: var(--muted); font-size: 12px; }
+  .statrow .v { font-weight: 700; }
+  .statrow .v.l { text-align: right; } .statrow .v.r { text-align: left; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; display: flex; overflow: hidden; }
+  .bar .fl { background: var(--esp); } .bar .fr { background: var(--arg); margin-left: auto; }
+
+  /* timeline */
+  .event { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .event:last-child { border-bottom: none; }
+  .event .min { color: var(--gold); font-weight: 700; min-width: 38px; font-variant-numeric: tabular-nums; }
+  .event .ico { min-width: 22px; text-align: center; }
+  .event .txt { flex: 1; } .event .txt small { color: var(--muted); }
+
+  /* prediction game */
+  .predict-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+  .popt {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 10px 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: transform .1s;
+  }
+  .popt:hover { transform: translateY(-1px); border-color: var(--gold); }
+  .popt.sel { border-color: var(--gold); background: #2a2a1a; }
+  .popt .pts { display: block; color: var(--gold); font-size: 11px; }
+  input[type=text] {
+    width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 9px 10px; font-size: 14px;
+  }
+  .btn {
+    background: var(--gold); color: #1a1408; border: none; border-radius: 8px;
+    padding: 10px 16px; font-weight: 800; font-size: 14px; cursor: pointer; width: 100%; margin-top: 8px;
+  }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .open-pred { background: var(--panel2); border-left: 3px solid var(--gold); border-radius: 6px; padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+  .lb-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row .streak { color: var(--gold); font-size: 12px; }
+  .toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--gold); color: #1a1408; font-weight: 800; padding: 12px 20px;
+    border-radius: 30px; box-shadow: 0 6px 20px rgba(0,0,0,.5); z-index: 99;
+    opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .footnote { color: var(--muted); font-size: 11px; margin-top: 14px; text-align: center; }
+  canvas { max-height: 220px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="scoreboard">
+    <div class="matchup">
+      <div class="team esp">
+        <img id="esp-logo" alt="Spain" src="https://a.espncdn.com/i/teamlogos/countries/500/esp.png">
+        <span class="name">SPAIN</span>
+      </div>
+      <div>
+        <div class="score" id="score">– : –</div>
+        <div class="status" id="status">Loading…</div>
+      </div>
+      <div class="team arg">
+        <img id="arg-logo" alt="Argentina" src="https://a.espncdn.com/i/teamlogos/countries/500/arg.png">
+        <span class="name">ARGENTINA</span>
+      </div>
+    </div>
+    <div class="meta" id="meta">FIFA World Cup 2026 Final · MetLife Stadium</div>
+  </div>
+
+  <div class="card">
+    <h2>Win Probability <span id="wp-src" style="text-transform:none"></span></h2>
+    <div class="wp-bar">
+      <div class="wp-esp" id="wp-esp" style="width:33%">33%</div>
+      <div class="wp-draw" id="wp-draw" style="width:34%">34%</div>
+      <div class="wp-arg" id="wp-arg" style="width:33%">33%</div>
+    </div>
+    <div class="wp-note" id="wp-note">In-play estimate updates with score, time remaining, and shot pressure.</div>
+  </div>
+
+  <div class="card">
+    <h2>🎯 Call The Next Event <span style="float:right;text-transform:none" id="pred-window"></span></h2>
+    <div id="pred-body">
+      <input type="text" id="player-name" placeholder="Your name (friends take turns!)" maxlength="20">
+      <div class="predict-opts" id="pred-opts"></div>
+      <button class="btn" id="pred-lock" disabled>Lock it in</button>
+      <div id="open-preds"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🏆 Leaderboard</h2>
+    <div id="leaderboard" class="hint">No predictions yet — first correct call takes the lead.</div>
+  </div>
+
+  <div class="card">
+    <h2>Attack Momentum</h2>
+    <canvas id="momentum-chart"></canvas>
+    <div class="hint" id="momentum-hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>xG Race</h2>
+    <canvas id="xg-chart"></canvas>
+    <div class="hint" id="xg-hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>Match Stats</h2>
+    <div id="stats"><div class="hint">Waiting for kickoff data…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Timeline</h2>
+    <div id="timeline"><div class="hint">Events appear here as they happen.</div></div>
+  </div>
+
+  <div class="footnote">
+    Data: ESPN (unofficial) + BALLDONTLIE · Personal use only · Win probability is a model estimate, not betting advice.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const CFG = {
+  espnEventId: "760517",
+  espnLeague: "fifa.world",
+  // Proxy paths (serve.py). ESPN falls back to direct if proxy missing (CORS is open on ESPN).
+  espnProxy: "/api/espn",
+  espnDirect: "https://site.api.espn.com",
+  bdlProxy: "/api/bdl",
+  pollEspnMs: 20000,
+  pollBdlMs: 65000,           // BDL trial = 5 req/min; we make ≤3/min via proxy cache
+  predictionWindowMin: 10,
+  pointValues: { goal_esp: 5, goal_arg: 5, yellow: 3, red: 8, sub: 2, corner: 1, shot_on: 2, nothing: 4 },
+};
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  score: { esp: null, arg: null }, statusTxt: "", clockMin: 0, live: false, finished: false,
+  events: [], stats: [], momentum: [], shots: [], bdlMatchId: null, bdlOk: null,
+  seenEventKeys: new Set(), lastScoreKey: "",
+  preds: JSON.parse(localStorage.getItem("wc_preds") || "[]"),
+  ledger: JSON.parse(localStorage.getItem("wc_ledger") || "{}"),
+  selOpt: null, charts: {},
+};
+
+/* ================= HELPERS ================= */
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`${r.status} ${url}`);
+  return r.json();
+}
+async function espn(path) {
+  try { return await getJSON(CFG.espnProxy + path); }
+  catch { return getJSON(CFG.espnDirect + path); }   // direct fallback (open CORS)
+}
+async function bdl(path) {
+  const r = await fetch(CFG.bdlProxy + path, { cache: "no-store" });
+  if (r.status === 503) { state.bdlOk = false; throw new Error("no-key"); }
+  if (!r.ok) throw new Error("bdl " + r.status);
+  state.bdlOk = true;
+  return r.json();
+}
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 4000);
+}
+function notify(title, body) {
+  if ("Notification" in window && Notification.permission === "granted")
+    new Notification(title, { body, icon: "icon-192.png" });
+}
+const num = (v) => { const n = parseFloat(String(v ?? "").replace("%", "")); return isNaN(n) ? 0 : n; };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ================= ESPN FEED ================= */
+async function pollEspn() {
+  try {
+    const sb = await espn(`/apis/site/v2/sports/soccer/${CFG.espnLeague}/scoreboard`);
+    const ev = (sb.events || []).find(e => e.id === CFG.espnEventId)
+      || (sb.events || []).find(e => /spain/i.test(e.name) && /argentina/i.test(e.name));
+    if (ev) {
+      const comp = ev.competitions?.[0];
+      const comps = comp?.competitors || [];
+      const espC = comps.find(c => /spain/i.test(c.team?.displayName || "")) || comps[0];
+      const argC = comps.find(c => /argentina/i.test(c.team?.displayName || "")) || comps[1];
+      const st = ev.status || comp?.status || {};
+      updateScore(num(espC?.score), num(argC?.score), st);
+    }
+  } catch (e) { console.warn("scoreboard", e); }
+
+  try {
+    const sum = await espn(`/apis/site/v2/sports/soccer/${CFG.espnLeague}/summary?event=${CFG.espnEventId}`);
+    if (sum.boxscore) renderStats(sum.boxscore);
+    ingestEspnEvents(sum.keyEvents || sum.commentary || []);
+    preMatchProbFromOdds(sum);
+  } catch (e) { console.warn("summary", e); }
+
+  renderWinProb();
+  resolveExpiredPredictions();
+}
+
+function updateScore(esp, arg, st) {
+  const type = st.type || {};
+  state.live = type.state === "in";
+  state.finished = type.state === "post";
+  state.clockMin = Math.round(num(st.displayClock || st.clock)) || state.clockMin;
+  state.statusTxt = type.shortDetail || type.description || "";
+  const key = `${esp}-${arg}`;
+  const changed = state.lastScoreKey && key !== state.lastScoreKey;
+  state.score = { esp, arg };
+  if (changed) {
+    toast(`⚽ GOAL! Spain ${esp} – ${arg} Argentina`);
+    notify("GOAL!", `Spain ${esp} – ${arg} Argentina`);
+  }
+  state.lastScoreKey = key;
+  $("score").textContent = `${esp ?? "–"} : ${arg ?? "–"}`;
+  const s = $("status");
+  s.textContent = state.statusTxt || (state.live ? "LIVE" : "Pre-match");
+  s.classList.toggle("live", state.live);
+}
+
+function ingestEspnEvents(list) {
+  for (const raw of list) {
+    const txt = raw.text || raw.type?.text || "";
+    const min = raw.clock?.displayValue || raw.time?.displayValue || "";
+    const key = `espn|${min}|${txt.slice(0, 60)}`;
+    if (!txt || state.seenEventKeys.has(key)) continue;
+    state.seenEventKeys.add(key);
+    const t = classifyEvent(txt);
+    state.events.push({ min, txt, kind: t.kind, ico: t.ico, src: "ESPN" });
+    onNewEvent(t.kind);
+  }
+  renderTimeline();
+}
+
+function classifyEvent(txt) {
+  const s = txt.toLowerCase();
+  if (/goal|scores|convert/.test(s) && /spain|espa/i.test(s)) return { kind: "goal_esp", ico: "⚽" };
+  if (/goal|scores|convert/.test(s) && /argentin/i.test(s)) return { kind: "goal_arg", ico: "⚽" };
+  if (/goal/.test(s)) return { kind: "goal", ico: "⚽" };
+  if (/red card/.test(s)) return { kind: "red", ico: "🟥" };
+  if (/yellow card|booking|booked/.test(s)) return { kind: "yellow", ico: "🟨" };
+  if (/substitut/.test(s)) return { kind: "sub", ico: "🔁" };
+  if (/corner/.test(s)) return { kind: "corner", ico: "🚩" };
+  if (/saved|save|on target/.test(s)) return { kind: "shot_on", ico: "🧤" };
+  if (/var/.test(s)) return { kind: "var", ico: "📺" };
+  return { kind: "other", ico: "▪️" };
+}
+
+function renderTimeline() {
+  if (!state.events.length) return;
+  $("timeline").innerHTML = state.events.slice(-40).reverse().map(e =>
+    `<div class="event"><span class="min">${e.min || ""}</span><span class="ico">${e.ico}</span>
+     <span class="txt">${e.txt} <small>· ${e.src}</small></span></div>`).join("");
+}
+
+/* stats grid from ESPN boxscore */
+const STAT_MAP = [
+  ["possessionPct", "Possession %"], ["totalShots", "Shots"], ["shotsOnTarget", "On Target"],
+  ["wonCorners", "Corners"], ["foulsCommitted", "Fouls"], ["yellowCards", "Yellow Cards"],
+  ["totalPasses", "Passes"], ["accuratePasses", "Accurate Passes"], ["effectiveTackles", "Tackles Won"],
+  ["totalCrosses", "Crosses"], ["offsides", "Offsides"], ["saves", "Saves"],
+];
+function renderStats(box) {
+  const teams = box.teams || [];
+  if (teams.length < 2) return;
+  const esp = teams.find(t => /spain/i.test(t.team?.displayName || "")) || teams[0];
+  const arg = teams.find(t => /argentina/i.test(t.team?.displayName || "")) || teams[1];
+  const get = (t, n) => (t.statistics || []).find(s => s.name === n)?.displayValue;
+  const rows = [];
+  for (const [name, label] of STAT_MAP) {
+    const a = get(esp, name), b = get(arg, name);
+    if (a === undefined && b === undefined) continue;
+    const av = num(a), bv = num(b), tot = av + bv || 1;
+    rows.push(`<div class="statrow">
+      <span class="v l">${a ?? "–"}</span>
+      <span><div class="label">${label}</div>
+        <div class="bar"><div class="fl" style="width:${(av / tot) * 100}%"></div><div class="fr" style="width:${(bv / tot) * 100}%"></div></div></span>
+      <span class="v r">${b ?? "–"}</span></div>`);
+    state.stats.push({ name, av, bv });
+  }
+  if (rows.length) $("stats").innerHTML = rows.join("");
+}
+
+/* ================= WIN PROBABILITY ================= */
+let preProb = null; // {esp, draw, arg} from pre-match odds if found
+function preMatchProbFromOdds(sum) {
+  if (preProb || !sum.odds?.length) return;
+  const o = sum.odds[0];
+  const toProb = (ml) => { const v = num(ml); if (!v) return 0; return v > 0 ? 100 / (v + 100) : -v / (-v + 100); };
+  const h = toProb(o.homeTeamOdds?.moneyLine), a = toProb(o.awayTeamOdds?.moneyLine), d = toProb(o.drawOdds?.moneyLine);
+  const tot = h + a + d;
+  if (tot > 0.5) preProb = { esp: h / tot, draw: d / tot, arg: a / tot };
+}
+function renderWinProb() {
+  let p;
+  if (!state.live && !state.finished && preProb) {
+    p = preProb; $("wp-src").textContent = "(pre-match odds)";
+  } else {
+    // Naive in-play Poisson: expected remaining goals scaled by shot pressure.
+    const minLeft = Math.max(0, 90 - state.clockMin);
+    const shots = state.stats.filter(s => s.name === "totalShots")[0];
+    const press = shots ? (shots.av + 1) / (shots.bv + 1) : 1;
+    const base = 1.15 * (minLeft / 90);                    // avg remaining goals per team-ish
+    const lE = base * Math.min(1.6, Math.max(0.6, press));
+    const lA = base * Math.min(1.6, Math.max(0.6, 1 / press));
+    const pois = (l, k) => Math.exp(-l) * Math.pow(l, k) / [1, 1, 2, 6, 24, 120][k];
+    let pe = 0, pd = 0, pa = 0;
+    const diff = (state.score.esp ?? 0) - (state.score.arg ?? 0);
+    for (let ge = 0; ge <= 5; ge++) for (let ga = 0; ga <= 5; ga++) {
+      const pr = pois(lE, ge) * pois(lA, ga), fin = diff + ge - ga;
+      if (fin > 0) pe += pr; else if (fin < 0) pa += pr; else pd += pr;
+    }
+    const tot = pe + pd + pa || 1;
+    p = { esp: pe / tot, draw: pd / tot, arg: pa / tot };
+    if (state.finished) p = diff > 0 ? { esp: 1, draw: 0, arg: 0 } : diff < 0 ? { esp: 0, draw: 0, arg: 1 } : { esp: 0, draw: 1, arg: 0 };
+    $("wp-src").textContent = state.finished ? "(final)" : "(in-play model)";
+  }
+  const set = (id, v) => { const el = $(id); el.style.width = (v * 100).toFixed(0) + "%"; el.textContent = (v * 100).toFixed(0) + "%"; };
+  set("wp-esp", p.esp); set("wp-draw", p.draw); set("wp-arg", p.arg);
+}
+
+/* ================= BALLDONTLIE FEED ================= */
+async function resolveBdlMatch() {
+  if (state.bdlMatchId) return state.bdlMatchId;
+  const j = await bdl(`/matches?dates[]=2026-07-19`);
+  const rows = j.data || [];
+  const m = rows.find(r => {
+    const s = JSON.stringify(r).toLowerCase();
+    return s.includes("spain") && s.includes("argentina");
+  }) || rows[0];
+  if (m) state.bdlMatchId = m.id;
+  return state.bdlMatchId;
+}
+let bdlTick = 0;
+async function pollBdl() {
+  try {
+    const id = await resolveBdlMatch();
+    if (!id) return;
+    // Alternate heavy calls to stay under trial rate limit (proxy caches 45s too).
+    if (bdlTick % 2 === 0) {
+      const j = await bdl(`/match_momentum?match_ids[]=${id}`);
+      state.momentum = normalizeMomentum(j.data || []);
+      drawMomentum();
+      $("momentum-hint").textContent = "";
+    } else {
+      const j = await bdl(`/match_shots?match_ids[]=${id}`);
+      state.shots = j.data || [];
+      drawXg();
+      $("xg-hint").textContent = "";
+    }
+    bdlTick++;
+  } catch (e) {
+    if (String(e.message) === "no-key" || state.bdlOk === false) {
+      const msg = `Add a BALLDONTLIE key to unlock — free 48h GOAT trial at app.balldontlie.io, then set BDL_API_KEY (Vercel: Project Settings → Environment Variables + redeploy · local: export it and restart serve.py)`;
+      $("momentum-hint").textContent = msg; $("xg-hint").textContent = msg;
+    } else console.warn("bdl", e);
+  }
+}
+function normalizeMomentum(rows) {
+  // Defensive: accept {minute,value} | {minute,home,away} | nested arrays
+  const out = [];
+  const flat = rows.flatMap(r => Array.isArray(r.momentum) ? r.momentum : Array.isArray(r.data) ? r.data : [r]);
+  for (const m of flat) {
+    const minute = m.minute ?? m.min ?? m.time;
+    let v = m.value ?? m.val;
+    if (v === undefined && m.home !== undefined) v = num(m.home) - num(m.away);
+    if (minute !== undefined && v !== undefined) out.push({ x: num(minute), y: num(v) });
+  }
+  return out.sort((a, b) => a.x - b.x);
+}
+
+/* ================= CHARTS ================= */
+function baseOpts() {
+  return {
+    responsive: true, animation: false, plugins: { legend: { labels: { color: "#8b94b0", boxWidth: 12 } } },
+    scales: {
+      x: { ticks: { color: "#8b94b0" }, grid: { color: "#26304f" }, type: "linear", min: 0, max: 95, title: { display: true, text: "Minute", color: "#8b94b0" } },
+      y: { ticks: { color: "#8b94b0" }, grid: { color: "#26304f" } },
+    },
+  };
+}
+function drawMomentum() {
+  const ctx = $("momentum-chart");
+  if (!state.momentum.length) return;
+  state.charts.mo?.destroy();
+  state.charts.mo = new Chart(ctx, {
+    type: "bar",
+    data: { datasets: [{ label: "◀ Spain pressure | Argentina pressure ▶", data: state.momentum,
+      backgroundColor: state.momentum.map(p => p.y >= 0 ? "#e63946" : "#6cb8e8"), parsing: false }] },
+    options: baseOpts(),
+  });
+}
+function drawXg() {
+  const ctx = $("xg-chart");
+  if (!state.shots.length) return;
+  const sideOf = (s) => JSON.stringify(s).toLowerCase().includes("spain") ? "esp" : "arg";
+  const mk = (side, color) => {
+    let acc = 0;
+    const pts = state.shots.filter(s => sideOf(s) === side)
+      .map(s => ({ m: num(s.minute ?? s.min), xg: num(s.xg ?? s.expected_goals ?? s.xG) }))
+      .sort((a, b) => a.m - b.m)
+      .map(s => ({ x: s.m, y: +(acc += s.xg).toFixed(2) }));
+    return { label: side === "esp" ? "Spain xG" : "Argentina xG", data: [{ x: 0, y: 0 }, ...pts],
+      borderColor: color, backgroundColor: color, stepped: true, pointRadius: 3, parsing: false };
+  };
+  state.charts.xg?.destroy();
+  state.charts.xg = new Chart(ctx, { type: "line", data: { datasets: [mk("esp", "#e63946"), mk("arg", "#6cb8e8")] }, options: baseOpts() });
+}
+
+/* ================= PREDICTION GAME ================= */
+const PRED_OPTS = [
+  ["goal_esp", "⚽ Spain goal"], ["goal_arg", "⚽ Argentina goal"], ["yellow", "🟨 Yellow card"],
+  ["red", "🟥 Red card"], ["sub", "🔁 Substitution"], ["corner", "🚩 Corner"],
+  ["shot_on", "🧤 Shot on target"], ["nothing", "😴 None of these"],
+];
+function renderPredOpts() {
+  $("pred-opts").innerHTML = PRED_OPTS.map(([k, label]) =>
+    `<button class="popt${state.selOpt === k ? " sel" : ""}" data-k="${k}">${label}<span class="pts">+${CFG.pointValues[k]} pts</span></button>`).join("");
+  document.querySelectorAll(".popt").forEach(b => b.onclick = () => { state.selOpt = b.dataset.k; renderPredOpts(); updateLockBtn(); });
+  $("pred-window").textContent = `next ${CFG.predictionWindowMin} min`;
+}
+function updateLockBtn() { $("pred-lock").disabled = !(state.selOpt && $("player-name").value.trim()); }
+$("player-name")?.addEventListener("input", updateLockBtn);
+function lockPrediction() {
+  const name = $("player-name").value.trim();
+  if (!name || !state.selOpt) return;
+  state.preds.push({ name, kind: state.selOpt, placedAt: Date.now(), atMin: state.clockMin, open: true });
+  persist(); state.selOpt = null; renderPredOpts(); renderOpenPreds(); updateLockBtn();
+  toast(`${name} predicts: ${PRED_OPTS.find(o => o[0] === state.preds.at(-1).kind)[1]}`);
+}
+function onNewEvent(kind) {
+  let hit = false;
+  for (const p of state.preds) {
+    if (!p.open) continue;
+    if (p.kind === kind || (p.kind === "goal_esp" && kind === "goal") || (p.kind === "goal_arg" && kind === "goal")) {
+      p.open = false; p.won = true;
+      const L = state.ledger[p.name] ||= { pts: 0, streak: 0, best: 0 };
+      L.pts += CFG.pointValues[p.kind]; L.streak++; L.best = Math.max(L.best, L.streak);
+      toast(`🎉 ${p.name} called it! +${CFG.pointValues[p.kind]} pts`);
+      hit = true;
+    }
+  }
+  if (hit) { persist(); renderLeaderboard(); renderOpenPreds(); }
+}
+function resolveExpiredPredictions() {
+  const now = Date.now(); let changed = false;
+  for (const p of state.preds) {
+    if (!p.open) continue;
+    if (now - p.placedAt > CFG.predictionWindowMin * 60000) {
+      p.open = false; changed = true;
+      const L = state.ledger[p.name] ||= { pts: 0, streak: 0, best: 0 };
+      if (p.kind === "nothing") { L.pts += CFG.pointValues.nothing; L.streak++; L.best = Math.max(L.best, L.streak); toast(`😴 ${p.name} was right — quiet spell! +${CFG.pointValues.nothing}`); }
+      else L.streak = 0;
+    }
+  }
+  if (changed) { persist(); renderLeaderboard(); renderOpenPreds(); }
+}
+function renderOpenPreds() {
+  const open = state.preds.filter(p => p.open);
+  $("open-preds").innerHTML = open.map(p => {
+    const left = Math.max(0, Math.ceil((p.placedAt + CFG.predictionWindowMin * 60000 - Date.now()) / 60000));
+    return `<div class="open-pred">⏳ <b>${esc(p.name)}</b>: ${PRED_OPTS.find(o => o[0] === p.kind)?.[1]} · ${left} min left</div>`;
+  }).join("");
+}
+function renderLeaderboard() {
+  const rows = Object.entries(state.ledger).sort((a, b) => b[1].pts - a[1].pts);
+  if (!rows.length) return;
+  $("leaderboard").innerHTML = rows.map(([n, l], i) =>
+    `<div class="lb-row"><span>${["🥇", "🥈", "🥉"][i] || "▪️"} <b>${esc(n)}</b> <span class="streak">${l.streak > 1 ? "🔥" + l.streak : ""}</span></span><span><b>${l.pts}</b> pts</span></div>`).join("");
+}
+function persist() {
+  localStorage.setItem("wc_preds", JSON.stringify(state.preds.slice(-200)));
+  localStorage.setItem("wc_ledger", JSON.stringify(state.ledger));
+}
+$("pred-lock").onclick = lockPrediction;
+
+/* ================= BOOT ================= */
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("Notification" in window && Notification.permission === "default")
+  setTimeout(() => Notification.requestPermission(), 4000);
+
+renderPredOpts(); renderOpenPreds(); renderLeaderboard();
+pollEspn(); pollBdl();
+setInterval(pollEspn, CFG.pollEspnMs);
+setInterval(pollBdl, CFG.pollBdlMs);
+setInterval(renderOpenPreds, 15000);
+</script>
+</body>
+</html>

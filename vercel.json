@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/espn/:path*", "destination": "https://site.api.espn.com/:path*" },
+    { "source": "/api/bdl/:path*", "destination": "/api/bdl?bdlpath=:path*" },
+    { "source": "/api/health", "destination": "/api/bdl?health=1" }
+  ]
+}
