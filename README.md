@@ -4,6 +4,15 @@ A second-screen PWA for today's final (3pm ET, MetLife Stadium). Live score, mat
 event timeline, win probability, attack momentum, xG race, and a pass-the-phone
 **"Call The Next Event"** prediction game with a leaderboard.
 
+## Live
+
+**https://world-cup-ride-along.vercel.app** — deployed on Vercel. Static PWA + `api/bdl.py`
+serverless function (BDL proxy, key stays server-side, CDN caches 45s) + `vercel.json`
+rewrites (`/api/espn/*` proxies straight to ESPN). Pushes to `main` auto-deploy.
+
+To unlock momentum/xG on the deployed app: add `BDL_API_KEY` in Vercel →
+Project Settings → Environment Variables, then redeploy.
+
 ## Quick start (2 minutes)
 
 ```bash
